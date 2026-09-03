@@ -8,8 +8,11 @@ from flask import Flask, request, jsonify
 from models import Base, Product, Purchase, User, Sale, Sale_detail, Payment
 from sqlalchemy.orm import Session
 from datetime import date 
+from flask_bcrypt import Bcrypt
+from flask import redirect,url_for
 
 app = Flask(__name__)
+bcrypt=Bcrypt(app)
 
 # Create a database using sqlalchemy engine
 engine = create_engine("sqlite:///./flask_duka_api.db", echo=True)
@@ -28,6 +31,8 @@ user = {
     'phone_number': '89439853489y'
 }
 
+
+
 @app.before_request
 def before_request():
     try:
@@ -37,8 +42,10 @@ def before_request():
         session.add(new_user)
         session.commit()
     except Exception as e:
-        session.rollback()
         print('User already exists or error occurred')
+
+
+
 
 @app.route('/')
 def home():
@@ -48,6 +55,8 @@ def home():
     else:
         error = {'Error': 'Method not allowed'}
         return jsonify(error), 405
+
+
 
 @app.route('/products', methods=['POST', 'GET'])
 def products():
@@ -70,7 +79,7 @@ def products():
         data = request.get_json()
         
         # Check for empty json or missing fields
-        if not data or not data.get('buying_price') or not data.get('selling_price'):
+        if not data or not data['buying_price'] or not data['selling_price']:
             error = {'Error': 'Ensure all fields are set'}
             return jsonify(error), 400
         
@@ -87,6 +96,11 @@ def products():
     else:
         error = {'Error': 'Method not allowed'}
         return jsonify(error), 405
+
+
+
+
+
 
 @app.route('/purchases', methods=['GET', 'POST'])
 def purchases():
@@ -108,7 +122,7 @@ def purchases():
         data = request.get_json()
         
         # Check for empty input
-        if not data or not data.get('product_id') or not data.get('date_purchased') or not data.get('purchase_price'):
+        if not data or not data['product_id'] or not data['date_purchased'] or not data['purchase_price']:
             return jsonify({'Message': 'Ensure all fields are set'}), 400
         
         # Add the purchase 
@@ -124,6 +138,12 @@ def purchases():
 
     else:
         return jsonify({'Message': 'Method Not Allowed'}), 405
+
+
+
+
+
+
 
 @app.route('/sales', methods=['POST', 'GET'])
 def sales():
@@ -144,7 +164,7 @@ def sales():
         data = request.get_json()
         
         # Check for empty input
-        if not data or not data.get('user_id') or not data.get('date_sold'):
+        if not data or not data['user_id'] or not data['date_sold']:
             return jsonify({'Message': 'Ensure all fields are set'}), 400
         
         date_sold = date.fromisoformat(data['date_sold'])
@@ -158,6 +178,11 @@ def sales():
 
     else:
         return jsonify({'Message': 'Method Not Allowed'}), 405
+
+
+
+
+
 
 @app.route('/sale-details', methods=['POST', 'GET'])
 def sale_detail():
@@ -180,7 +205,7 @@ def sale_detail():
         data = request.get_json()
         
         # Check for empty input
-        if not data or not data.get('product_id') or not data.get('sale_id') or not data.get('quantity') or not data.get('amount'):
+        if not data or not data['product_id'] or not data['sale_id'] or not data['quantity'] or not data['amount']:
             return jsonify({'message': 'All fields are required'}), 400
 
         new_sale_detail = Sale_detail(
@@ -195,6 +220,11 @@ def sale_detail():
 
     else:
         return jsonify({'message': 'method not allowed'}), 405
+
+
+
+
+
 
 @app.route('/payment', methods=['POST', 'GET'])
 def payment():
@@ -215,7 +245,7 @@ def payment():
         data = request.get_json()
         
         # Check for empty input
-        if not data or not data.get('sale_id') or not data.get('date_paid'):
+        if not data or not data['sale_id'] or not data['date_paid']:
             return jsonify({'message': 'All fields are required'}), 400
 
         date_paid = date.fromisoformat(data['date_paid'])
@@ -230,4 +260,58 @@ def payment():
     else:
         return jsonify({'message': 'method not allowed'}), 405
 
+@app.route('/login',methods=['POST','GET'])
+def login():
+    if request.method=='GET':
+        pass
+    elif request.method=='POST':
+        login_data=request.get_json()
+        if not login_data['password'] or not login_data['email']:
+            res={'error':'ensure all fields are set'}
+            res=jsonify(res),405
+        else:
+            trial=login_data['email']
+            query=select(User).where(User.email==trial)
+            user=session.scalars(query).first()
+            if not user:
+                res={'Error':'User not found'}
+                return redirect(url_for('login'))
+
+                
+            else:
+                # password=bcrypt.generate_password_hash(login_data['password']).decode('utf-8')
+                if bcrypt.check_password_hash(user.password,login_data['password']):
+                    user_id={'id':user.id}
+                         
+                    return jsonify(user_id),201
+    else:
+        res={'error':'method not allowed'}
+    return jsonify(res)
+@app.route('/register',methods=['POST','GET'])
+def register():
+    if request.method=='POST':
+        data=request.get_json()
+        res=None
+        if not data['full_name'] or not data['password'] or not data['email']:
+            res={'Error':'all fields are required'}
+            return jsonify(res),403
+        else:
+            password=data['password']
+            hashed_password=bcrypt.generate_password_hash(password).decode('utf-8')
+            new_user=User(
+                full_name=data['full_name'],
+                email=data['email'],
+                password=hashed_password
+            )
+        session.add(new_user)
+        session.commit()
+        res={'Success':'user added successfully'}
+        return jsonify(res),201
+    
+    elif request.method=='GET':
+        pass
+    else:
+        res={'Error':'Method not allowed'}
+        res=jsonify(res),405
+    return res
 app.run(debug=True)

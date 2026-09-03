@@ -10,6 +10,9 @@ from datetime import date
 class Base(DeclarativeBase):
      pass
 
+
+
+
 class User(Base):
     __tablename__='users'
 
@@ -17,6 +20,9 @@ class User(Base):
     full_name:Mapped[str]=mapped_column(String(100))
     email:Mapped[str]=mapped_column(String(100))
     password:Mapped[str]=mapped_column(String(100))
+
+
+
 
 class Product(Base):
     __tablename__='products'
@@ -26,6 +32,9 @@ class Product(Base):
     buying_price : Mapped[float]=mapped_column(Float)
     selling_price : Mapped[float]=mapped_column(Float)
 
+
+
+
 class Sale(Base):
     __tablename__='sales'
 
@@ -33,18 +42,29 @@ class Sale(Base):
     user_id:Mapped[int]=mapped_column(Integer,ForeignKey('users.id'))
     date_sold:Mapped[date]=mapped_column(Date)
 
+
+
+
+
 class Payment(Base):
     __tablename__='payments'
     id:Mapped[int]=mapped_column(Integer,primary_key=True)
     sale_id:Mapped[int]=mapped_column(Integer,ForeignKey('sales.id'))
     date_paid:Mapped[date]=mapped_column(Date)
+
+
+
+
 class Purchase(Base):
     __tablename__='purchases'
     id:Mapped[int]=mapped_column(Integer,primary_key=True)
     product_id:Mapped[int]=mapped_column(Integer,ForeignKey('products.id'))
-    date_purchased:Mapped[date]=mapped_column(Date)
     purchase_price :  Mapped[Float] = mapped_column(Float)
-    
+    date_purchased:Mapped[date]=mapped_column(Date)
+
+
+
+
 class Sale_detail(Base):
     __tablename__='sales_details'
     id:Mapped[int]=mapped_column(Integer,primary_key=True)
