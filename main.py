@@ -5,14 +5,19 @@
 # It has to return data as JSON
 from sqlalchemy import create_engine, select
 from flask import Flask, request, jsonify
+from flask_jwt_extended import jwt_required,create_access_token,get_jwt_identity,JWTManager
 from models import Base, Product, Purchase, User, Sale, Sale_detail, Payment
 from sqlalchemy.orm import Session
 from datetime import date 
 from flask_bcrypt import Bcrypt
 from flask import redirect,url_for
 
+
 app = Flask(__name__)
+app.config['JWT_SECRET_KEY']='awfegjenhingvrhuigbt54iucn'
 bcrypt=Bcrypt(app)
+jwt=JWTManager(app)
+
 
 # Create a database using sqlalchemy engine
 engine = create_engine("sqlite:///./flask_duka_api.db", echo=True)
@@ -59,7 +64,10 @@ def home():
 
 
 @app.route('/products', methods=['POST', 'GET'])
-def products():
+@jwt_required()
+def products(): 
+    email=get_jwt_identity()
+    user=session.scalars(select(User).where(User.email==email)).first()
     if request.method == 'GET':
         # Fetch data from the database
         query = select(Product)
@@ -85,7 +93,7 @@ def products():
         
         # Store in the database
         new_product = Product(
-            user_id=user['id'],
+            user_id=data['id'],
             buying_price=float(data['buying_price']),
             selling_price=float(data['selling_price'])
         )
@@ -266,7 +274,9 @@ def login():
         pass
     elif request.method=='POST':
         login_data=request.get_json()
-        if not login_data['password'] or not login_data['email']:
+        email=login_data['email']
+        password=login_data['password']
+        if not password or not email:
             res={'error':'ensure all fields are set'}
             res=jsonify(res),405
         else:
@@ -279,11 +289,14 @@ def login():
 
                 
             else:
-                # password=bcrypt.generate_password_hash(login_data['password']).decode('utf-8')
                 if bcrypt.check_password_hash(user.password,login_data['password']):
-                    user_id={'id':user.id}
+                    token=create_access_token(identity=email)
+                    user_id={'id':user.id,
+                             'token':token}
                          
                     return jsonify(user_id),201
+                
+                
     else:
         res={'error':'method not allowed'}
     return jsonify(res)
@@ -305,7 +318,9 @@ def register():
             )
         session.add(new_user)
         session.commit()
-        res={'Success':'user added successfully'}
+        token=create_access_token(identity=data['email'])
+        res={'Success':'user added successfully',
+             'token':token}
         return jsonify(res),201
     
     elif request.method=='GET':
