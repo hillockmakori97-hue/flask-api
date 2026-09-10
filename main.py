@@ -4,6 +4,8 @@
 # It has to have a status code
 # It has to return data as JSON
 from sqlalchemy import create_engine, select
+import sentry_sdk
+
 from flask import Flask, request, jsonify
 from flask_jwt_extended import jwt_required,create_access_token,get_jwt_identity,JWTManager
 from models import Base, Product, Purchase, User, Sale, Sale_detail, Payment
@@ -11,7 +13,28 @@ from sqlalchemy.orm import Session
 from datetime import date 
 from flask_bcrypt import Bcrypt
 from flask import redirect,url_for
+import sentry_sdk
+from sentry_sdk.integrations.flask import FlaskIntegration
+from sqlalchemy.orm import Session
+from datetime import date
+from flask_bcrypt import Bcrypt
+from flask import redirect, url_for
 
+sentry_sdk.init(
+    dsn="https://6fadeab3e9a236d53adbad8eefef34ee@o4512051738443776.ingest.us.sentry.io/4512057171509248 ",
+    integrations=[FlaskIntegration()],
+    send_default_pii=True,
+    enable_logs=True,
+    traces_sample_rate=1.0,
+    profile_session_sample_rate=1.0,
+    profile_lifecycle="trace",
+    debug=True
+    
+)
+# Test Sentry immediately on app launch
+sentry_sdk.capture_message("Sentry test message on startup!")
+
+app = Flask(__name__)
 
 app = Flask(__name__)
 app.config['JWT_SECRET_KEY']='awfegjenhingvrhuigbt54iucn'
@@ -36,7 +59,7 @@ user = {
     'phone_number': '89439853489y'
 }
 
-
+alloweed_methods=['POST','GET','PUT','PATCH','DELETE']
 
 @app.before_request
 def before_request():
@@ -49,7 +72,10 @@ def before_request():
     except Exception as e:
         print('User already exists or error occurred')
 
-
+@app.route("/sentry-message")
+def trigger_message():
+    sentry_sdk.capture_message("Hello from Flask! Sentry test message.")
+    return "Message sent to Sentry!"
 
 
 @app.route('/')
@@ -63,7 +89,7 @@ def home():
 
 
 
-@app.route('/products', methods=['POST', 'GET'])
+@app.route('/products', methods=alloweed_methods)
 @jwt_required()
 def products(): 
     email=get_jwt_identity()
@@ -110,7 +136,8 @@ def products():
 
 
 
-@app.route('/purchases', methods=['GET', 'POST'])
+@app.route('/purchases', methods=alloweed_methods)
+@jwt_required
 def purchases():
     if request.method == 'GET':
         query = select(Purchase)
@@ -153,7 +180,7 @@ def purchases():
 
 
 
-@app.route('/sales', methods=['POST', 'GET'])
+@app.route('/sales', methods=alloweed_methods)
 def sales():
     if request.method == 'GET':
         query = select(Sale)
@@ -192,7 +219,7 @@ def sales():
 
 
 
-@app.route('/sale-details', methods=['POST', 'GET'])
+@app.route('/sale-details', methods=alloweed_methods)
 def sale_detail():
     if request.method == 'GET':
         query = select(Sale_detail)
@@ -234,7 +261,7 @@ def sale_detail():
 
 
 
-@app.route('/payment', methods=['POST', 'GET'])
+@app.route('/payment', methods=alloweed_methods)
 def payment():
     if request.method == 'GET':
         query = select(Payment)
@@ -268,7 +295,7 @@ def payment():
     else:
         return jsonify({'message': 'method not allowed'}), 405
 
-@app.route('/login',methods=['POST','GET'])
+@app.route('/login',methods=alloweed_methods)
 def login():
     if request.method=='GET':
         pass
@@ -300,7 +327,7 @@ def login():
     else:
         res={'error':'method not allowed'}
     return jsonify(res)
-@app.route('/register',methods=['POST','GET'])
+@app.route('/register',methods=alloweed_methods)
 def register():
     if request.method=='POST':
         data=request.get_json()
