@@ -27,8 +27,7 @@ sentry_sdk.init(
     enable_logs=True,
     traces_sample_rate=1.0,
     profile_session_sample_rate=1.0,
-    profile_lifecycle="trace",
-    debug=True
+    profile_lifecycle="trace"
     
 )
 # Test Sentry immediately on app launch
@@ -137,7 +136,7 @@ def products():
 
 
 @app.route('/purchases', methods=alloweed_methods)
-@jwt_required
+@jwt_required()
 def purchases():
     if request.method == 'GET':
         query = select(Purchase)
@@ -181,6 +180,7 @@ def purchases():
 
 
 @app.route('/sales', methods=alloweed_methods)
+@jwt_required()
 def sales():
     if request.method == 'GET':
         query = select(Sale)
@@ -220,6 +220,7 @@ def sales():
 
 
 @app.route('/sale-details', methods=alloweed_methods)
+@jwt_required()
 def sale_detail():
     if request.method == 'GET':
         query = select(Sale_detail)
@@ -262,6 +263,7 @@ def sale_detail():
 
 
 @app.route('/payment', methods=alloweed_methods)
+@jwt_required()
 def payment():
     if request.method == 'GET':
         query = select(Payment)
@@ -343,7 +345,10 @@ def register():
                 email=data['email'],
                 password=hashed_password
             )
-        session.add(new_user)
+        try:
+            session.add(new_user)
+        except Exception as e:
+            return jsonify({'error':'user already exists'})
         session.commit()
         token=create_access_token(identity=data['email'])
         res={'Success':'user added successfully',

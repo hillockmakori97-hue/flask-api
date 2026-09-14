@@ -18,7 +18,7 @@ class User(Base):
 
     id : Mapped[int]=mapped_column(Integer,primary_key=True)
     full_name:Mapped[str]=mapped_column(String(100))
-    email:Mapped[str]=mapped_column(String(100))
+    email:Mapped[str]=mapped_column(String(100),unique=True)
     password:Mapped[str]=mapped_column(String(100))
 
 
