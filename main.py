@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from datetime import date
 from flask_bcrypt import Bcrypt
 from flask import redirect, url_for
+from flask_cors import CORS
 
 sentry_sdk.init(
     dsn="https://6fadeab3e9a236d53adbad8eefef34ee@o4512051738443776.ingest.us.sentry.io/4512057171509248 ",
@@ -34,8 +35,7 @@ sentry_sdk.init(
 sentry_sdk.capture_message("Sentry test message on startup!")
 
 app = Flask(__name__)
-
-app = Flask(__name__)
+CORS(app)
 app.config['JWT_SECRET_KEY']='awfegjenhingvrhuigbt54iucn'
 bcrypt=Bcrypt(app)
 jwt=JWTManager(app)
