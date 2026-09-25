@@ -1,5 +1,5 @@
 # Rest Api- This is a backend route that follows the four rules below
-# it has to have a route 
+# It has to have a route 
 # It has to have a method (POST/GET/PUT/DELETE)
 # It has to have a status code
 # It has to return data as JSON
@@ -7,39 +7,35 @@ from sqlalchemy import create_engine, select
 import sentry_sdk
 
 from flask import Flask, request, jsonify
-from flask_jwt_extended import jwt_required,create_access_token,get_jwt_identity,JWTManager
+from flask_jwt_extended import jwt_required, create_access_token, get_jwt_identity, JWTManager
 from models import Base, Product, Purchase, User, Sale, Sale_detail, Payment
 from sqlalchemy.orm import Session
 from datetime import date 
 from flask_bcrypt import Bcrypt
-from flask import redirect,url_for
-import sentry_sdk
-from sentry_sdk.integrations.flask import FlaskIntegration
-from sqlalchemy.orm import Session
-from datetime import date
-from flask_bcrypt import Bcrypt
 from flask import redirect, url_for
+from sentry_sdk.integrations.flask import FlaskIntegration
 from flask_cors import CORS
 
 sentry_sdk.init(
-    dsn="https://6fadeab3e9a236d53adbad8eefef34ee@o4512051738443776.ingest.us.sentry.io/4512057171509248 ",
+    dsn="https://6fadeab3e9a236d53adbad8eefef34ee@o4512051738443776.ingest.us.sentry.io/4512057171509248",
     integrations=[FlaskIntegration()],
     send_default_pii=True,
     enable_logs=True,
     traces_sample_rate=1.0,
     profile_session_sample_rate=1.0,
     profile_lifecycle="trace"
-    
 )
 # Test Sentry immediately on app launch
 sentry_sdk.capture_message("Sentry test message on startup!")
 
 app = Flask(__name__)
-CORS(app)
-app.config['JWT_SECRET_KEY']='awfegjenhingvrhuigbt54iucn'
-bcrypt=Bcrypt(app)
-jwt=JWTManager(app)
 
+# Configure CORS globally for all routes and origins
+CORS(app, resources={r"/*": {"origins": "*"}})
+
+app.config['JWT_SECRET_KEY'] = 'awfegjenhingvrhuigbt54iucn'
+bcrypt = Bcrypt(app)
+jwt = JWTManager(app)
 
 # Create a database using sqlalchemy engine
 engine = create_engine("sqlite:///./flask_duka_api.db", echo=True)
@@ -50,32 +46,19 @@ Base.metadata.create_all(engine)
 # Create a session to do sql transaction 
 session = Session(engine)
 
-user = {
-    'id': 7,
-    'full_name': 'hillock',
-    'email': 'hillockmakori97@gmail.com',
-    'password': '2345',
-    'phone_number': '89439853489y'
-}
-
-alloweed_methods=['POST','GET','PUT','PATCH','DELETE']
+alloweed_methods = ['POST', 'GET', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
 
 @app.before_request
 def before_request():
-    try:
-        print('a new request is coming')
-        # Note: Passes dictionary unpack or user object based on model definition
-        new_user = User(**user)
-        session.add(new_user)
-        session.commit()
-    except Exception as e:
-        print('User already exists or error occurred')
+    # Bypass heavy db operations for CORS preflight OPTIONS requests
+    if request.method == 'OPTIONS':
+        return
+    print('A new request is coming:', request.path)
 
 @app.route("/sentry-message")
 def trigger_message():
     sentry_sdk.capture_message("Hello from Flask! Sentry test message.")
     return "Message sent to Sentry!"
-
 
 @app.route('/')
 def home():
@@ -86,19 +69,16 @@ def home():
         error = {'Error': 'Method not allowed'}
         return jsonify(error), 405
 
-
-
 @app.route('/products', methods=alloweed_methods)
 @jwt_required()
 def products(): 
-    email=get_jwt_identity()
-    user=session.scalars(select(User).where(User.email==email)).first()
+    email = get_jwt_identity()
+    user = session.scalars(select(User).where(User.email == email)).first()
     if request.method == 'GET':
-        # Fetch data from the database
         query = select(Product)
-        products = session.scalars(query)
+        products_list = session.scalars(query)
         results = []
-        for prod in products:
+        for prod in products_list:
             p = {
                 'id': prod.id,
                 'user_id': prod.user_id,
@@ -109,16 +89,14 @@ def products():
         return jsonify(results), 200
 
     elif request.method == 'POST':
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         
-        # Check for empty json or missing fields
-        if not data or not data['buying_price'] or not data['selling_price']:
+        if not data.get('buying_price') or not data.get('selling_price'):
             error = {'Error': 'Ensure all fields are set'}
             return jsonify(error), 400
         
-        # Store in the database
         new_product = Product(
-            user_id=data['id'],
+            user_id=data.get('id'),
             buying_price=float(data['buying_price']),
             selling_price=float(data['selling_price'])
         )
@@ -129,11 +107,6 @@ def products():
     else:
         error = {'Error': 'Method not allowed'}
         return jsonify(error), 405
-
-
-
-
-
 
 @app.route('/purchases', methods=alloweed_methods)
 @jwt_required()
@@ -153,13 +126,11 @@ def purchases():
         return jsonify(result), 200
 
     elif request.method == 'POST':
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         
-        # Check for empty input
-        if not data or not data['product_id'] or not data['date_purchased'] or not data['purchase_price']:
+        if not data.get('product_id') or not data.get('date_purchased') or not data.get('purchase_price'):
             return jsonify({'Message': 'Ensure all fields are set'}), 400
         
-        # Add the purchase 
         convert_date = date.fromisoformat(data['date_purchased'])
         new_purchase = Purchase(
             product_id=data['product_id'],
@@ -172,12 +143,6 @@ def purchases():
 
     else:
         return jsonify({'Message': 'Method Not Allowed'}), 405
-
-
-
-
-
-
 
 @app.route('/sales', methods=alloweed_methods)
 @jwt_required()
@@ -196,10 +161,9 @@ def sales():
         return jsonify(result), 200
 
     elif request.method == 'POST':
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         
-        # Check for empty input
-        if not data or not data['user_id'] or not data['date_sold']:
+        if not data.get('user_id') or not data.get('date_sold'):
             return jsonify({'Message': 'Ensure all fields are set'}), 400
         
         date_sold = date.fromisoformat(data['date_sold'])
@@ -213,11 +177,6 @@ def sales():
 
     else:
         return jsonify({'Message': 'Method Not Allowed'}), 405
-
-
-
-
-
 
 @app.route('/sale-details', methods=alloweed_methods)
 @jwt_required()
@@ -238,10 +197,9 @@ def sale_detail():
         return jsonify(result), 200
 
     elif request.method == 'POST':
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         
-        # Check for empty input
-        if not data or not data['product_id'] or not data['sale_id'] or not data['quantity'] or not data['amount']:
+        if not data.get('product_id') or not data.get('sale_id') or not data.get('quantity') or not data.get('amount'):
             return jsonify({'message': 'All fields are required'}), 400
 
         new_sale_detail = Sale_detail(
@@ -256,11 +214,6 @@ def sale_detail():
 
     else:
         return jsonify({'message': 'method not allowed'}), 405
-
-
-
-
-
 
 @app.route('/payment', methods=alloweed_methods)
 @jwt_required()
@@ -279,10 +232,9 @@ def payment():
         return jsonify(result), 200
         
     elif request.method == 'POST':
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         
-        # Check for empty input
-        if not data or not data['sale_id'] or not data['date_paid']:
+        if not data.get('sale_id') or not data.get('date_paid'):
             return jsonify({'message': 'All fields are required'}), 400
 
         date_paid = date.fromisoformat(data['date_paid'])
@@ -297,68 +249,72 @@ def payment():
     else:
         return jsonify({'message': 'method not allowed'}), 405
 
-@app.route('/login',methods=alloweed_methods)
+@app.route('/login', methods=alloweed_methods)
 def login():
-    if request.method=='GET':
-        pass
-    elif request.method=='POST':
-        login_data=request.get_json()
-        email=login_data['email']
-        password=login_data['password']
-        if not password or not email:
-            res={'error':'ensure all fields are set'}
-            res=jsonify(res),405
-        else:
-            trial=login_data['email']
-            query=select(User).where(User.email==trial)
-            user=session.scalars(query).first()
-            if not user:
-                res={'Error':'User not found'}
-                return redirect(url_for('login'))
+    if request.method == 'OPTIONS':
+        return '', 200
 
-                
-            else:
-                if bcrypt.check_password_hash(user.password,login_data['password']):
-                    token=create_access_token(identity=email)
-                    user_id={'id':user.id,
-                             'token':token}
-                         
-                    return jsonify(user_id),201
-                
-                
-    else:
-        res={'error':'method not allowed'}
-    return jsonify(res)
-@app.route('/register',methods=alloweed_methods)
-def register():
-    if request.method=='POST':
-        data=request.get_json()
-        res=None
-        if not data['full_name'] or not data['password'] or not data['email']:
-            res={'Error':'all fields are required'}
-            return jsonify(res),403
+    if request.method == 'POST':
+        login_data = request.get_json(silent=True) or {}
+        email = login_data.get('email')
+        password = login_data.get('password')
+        
+        if not password or not email:
+            return jsonify({'error': 'ensure all fields are set'}), 400
+            
+        query = select(User).where(User.email == email)
+        user = session.scalars(query).first()
+        
+        if not user:
+            return jsonify({'Error': 'User not found'}), 404
+            
+        if bcrypt.check_password_hash(user.password, password):
+            token = create_access_token(identity=email)
+            return jsonify({'id': user.id, 'token': token}), 200
         else:
-            password=data['password']
-            hashed_password=bcrypt.generate_password_hash(password).decode('utf-8')
-            new_user=User(
-                full_name=data['full_name'],
-                email=data['email'],
-                password=hashed_password
-            )
+            return jsonify({'error': 'Invalid credentials'}), 401
+            
+    return jsonify({'error': 'method not allowed'}), 405
+
+@app.route('/register', methods=alloweed_methods)
+def register():
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or {}
+        full_name = data.get('full_name')
+        email = data.get('email')
+        password = data.get('password')
+
+        if not full_name or not password or not email:
+            return jsonify({'Error': 'all fields are required'}), 400
+
+        # Check for existing user
+        existing_user = session.scalars(select(User).where(User.email == email)).first()
+        if existing_user:
+            return jsonify({'error': 'user already exists'}), 400
+
+        hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
+        new_user = User(
+            full_name=full_name,
+            email=email,
+            password=hashed_password
+        )
+
         try:
             session.add(new_user)
+            session.commit()
         except Exception as e:
-            return jsonify({'error':'user already exists'})
-        session.commit()
-        token=create_access_token(identity=data['email'])
-        res={'Success':'user added successfully',
-             'token':token}
-        return jsonify(res),201
+            session.rollback()
+            return jsonify({'error': 'database insertion failed'}), 500
+
+        token = create_access_token(identity=email)
+        res = {
+            'message': 'user registered successfully',
+            'token': token
+        }
+        return jsonify(res), 201
     
-    elif request.method=='GET':
-        pass
-    else:
-        res={'Error':'Method not allowed'}
-        res=jsonify(res),405
-    return res
+    return jsonify({'Error': 'Method not allowed'}), 405
 app.run(debug=True)
