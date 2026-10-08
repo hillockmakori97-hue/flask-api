@@ -30,8 +30,12 @@ sentry_sdk.capture_message("Sentry test message on startup!")
 
 app = Flask(__name__)
 
-# Configure CORS globally for all routes and origins
-CORS(app, resources={r"/*": {"origins": "*"}})
+# Configure CORS globally to allow headers required for JWT
+CORS(app, resources={r"/*": {
+    "origins": "*",
+    "allow_headers": ["Content-Type", "Authorization"],
+    "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+}})
 
 app.config['JWT_SECRET_KEY'] = 'awfegjenhingvrhuigbt54iucn'
 bcrypt = Bcrypt(app)
@@ -49,10 +53,10 @@ session = Session(engine)
 alloweed_methods = ['POST', 'GET', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
 
 @app.before_request
-def before_request():
-    # Bypass heavy db operations for CORS preflight OPTIONS requests
+def handle_preflight():
+    # Automatically return 200 OK for any OPTIONS request before JWT check runs
     if request.method == 'OPTIONS':
-        return
+        return jsonify({'status': 'OK'}), 200
     print('A new request is coming:', request.path)
 
 @app.route("/sentry-message")
@@ -74,6 +78,7 @@ def home():
 def products(): 
     email = get_jwt_identity()
     user = session.scalars(select(User).where(User.email == email)).first()
+    
     if request.method == 'GET':
         query = select(Product)
         products_list = session.scalars(query)
@@ -97,6 +102,7 @@ def products():
         
         new_product = Product(
             user_id=data.get('id'),
+            product_name=data.get('product_name'),
             buying_price=float(data['buying_price']),
             selling_price=float(data['selling_price'])
         )
@@ -251,9 +257,6 @@ def payment():
 
 @app.route('/login', methods=alloweed_methods)
 def login():
-    if request.method == 'OPTIONS':
-        return '', 200
-
     if request.method == 'POST':
         login_data = request.get_json(silent=True) or {}
         email = login_data.get('email')
@@ -278,9 +281,6 @@ def login():
 
 @app.route('/register', methods=alloweed_methods)
 def register():
-    if request.method == 'OPTIONS':
-        return '', 200
-
     if request.method == 'POST':
         data = request.get_json(silent=True) or {}
         full_name = data.get('full_name')
@@ -317,4 +317,6 @@ def register():
         return jsonify(res), 201
     
     return jsonify({'Error': 'Method not allowed'}), 405
+
+
 app.run(debug=True)
