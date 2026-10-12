@@ -15,6 +15,7 @@ from flask_bcrypt import Bcrypt
 from flask import redirect, url_for
 from sentry_sdk.integrations.flask import FlaskIntegration
 from flask_cors import CORS
+from mpesa import make_stk_push
 
 sentry_sdk.init(
     dsn="https://6fadeab3e9a236d53adbad8eefef34ee@o4512051738443776.ingest.us.sentry.io/4512057171509248",
@@ -74,8 +75,9 @@ def home():
         return jsonify(error), 405
 
 @app.route('/products', methods=alloweed_methods)
+@app.route('/products/<int:product_id>', methods=alloweed_methods)
 @jwt_required()
-def products(): 
+def products(product_id=None): 
     email = get_jwt_identity()
     user = session.scalars(select(User).where(User.email == email)).first()
     
@@ -87,6 +89,7 @@ def products():
             p = {
                 'id': prod.id,
                 'user_id': prod.user_id,
+                'product_name':prod.product_name,
                 'buying_price': prod.buying_price,
                 'selling_price': prod.selling_price
             }
@@ -109,7 +112,29 @@ def products():
         session.add(new_product)
         session.commit()
         return jsonify({'Message': 'New product added'}), 201
+    elif request.method=='PUT':
+        if not product_id:
+            return jsonify({'error':'Product Id required for updating '}),400
+        
+        product=session.scalars(
+            select(Product)
+            .where(Product.id==product_id)
+            ).first()
+        if not product:
+            return jsonify({'error':'Product Not Found '}),404
+        data=request.get_json(silent=True) or {}
+        if 'product_name' in data:
+            product.product_name=data['product_name']
+        if 'buying_price' in data:
+            product.buying_price = float(data['buying_price'])
+        if 'selling_price' in data:
+            product.selling_price = float(data['selling_price'])
+        session.commit()
+        return jsonify({
+            'Message':'Product Updated Successfully'
+        }),200
 
+        
     else:
         error = {'Error': 'Method not allowed'}
         return jsonify(error), 405
@@ -151,8 +176,9 @@ def purchases():
         return jsonify({'Message': 'Method Not Allowed'}), 405
 
 @app.route('/sales', methods=alloweed_methods)
+@app.route('/sales/<int:sale_id>', methods=alloweed_methods)
 @jwt_required()
-def sales():
+def sales(sale_id=None):
     if request.method == 'GET':
         query = select(Sale)
         sales_list = session.scalars(query)
@@ -161,7 +187,7 @@ def sales():
             item = {
                 'id': i.id,
                 'user_id': i.user_id,
-                'date_sold': i.date_sold
+                'date_sold': i.date_sold.isoformat() if i.date_sold else None
             }
             result.append(item)
         return jsonify(result), 200
@@ -170,7 +196,7 @@ def sales():
         data = request.get_json(silent=True) or {}
         
         if not data.get('user_id') or not data.get('date_sold'):
-            return jsonify({'Message': 'Ensure all fields are set'}), 400
+            return jsonify({'error': 'Ensure all fields are set'}), 400
         
         date_sold = date.fromisoformat(data['date_sold'])
         new_sale = Sale(
@@ -181,9 +207,30 @@ def sales():
         session.commit()
         return jsonify({'Message': 'Sale Added Successfully'}), 201
 
-    else:
-        return jsonify({'Message': 'Method Not Allowed'}), 405
+    elif request.method == 'PUT':
+        if not sale_id:
+            return jsonify({'error': 'Sale Id required for updating'}), 400
+        
+        sale = session.scalars(
+            select(Sale)
+            .where(Sale.id == sale_id)
+        ).first()
+        
+        if not sale:
+            return jsonify({'error': 'Sale Not Found'}), 404
+            
+        data = request.get_json(silent=True) or {}
+        
+        if 'user_id' in data:
+            sale.user_id = data['user_id']
+        if 'date_sold' in data:
+            sale.date_sold = date.fromisoformat(data['date_sold'])
+            
+        session.commit()
+        return jsonify({'Message': 'Sale Updated Successfully'}), 200
 
+    else:
+        return jsonify({'error': 'Method Not Allowed'}), 405
 @app.route('/sale-details', methods=alloweed_methods)
 @jwt_required()
 def sale_detail():
@@ -317,6 +364,59 @@ def register():
         return jsonify(res), 201
     
     return jsonify({'Error': 'Method not allowed'}), 405
+@app.route('/stk-push',methods=alloweed_methods)
+def stk_push():
+    
+    try:
+        payload=request.get_json()
+        response=make_stk_push(payload)
+        new_payment=Payment(
+            sale_id=payload['sale_id'],
+            amount=payload['amount'],
+            phone_number=payload['phone_number'],
+            mrid=response.get('MerchantRequestID'),
+            crid=response.get('CheckoutRequestID'),
+            status='pending'
+        )
+        session.add(new_payment)
+        session.commit()
+        return {'message':"stk push initiated"}
+        
+    except Exception as e:
+        print(f'stk-push error:{e}')
+        session.rollback()
+        return jsonify({"error":"stk push failed"}),500
+
+
+@app.route('/saf-callback', methods=alloweed_methods)
+def saf_callback():
+    try:
+        payload=request.get_json()
+        body=payload.get(
+            'Body',{}
+        )
+        stkCallback=body.get('stkCallback',{})
+        result_code=stkCallback.get('ResultCode')
+        mrid = stkCallback.get('MerchantRequestID')
+        crid = stkCallback.get('CheckoutRequestID')
+        payment=session.execute(select(Payment).where(Payment.mrid == mrid, Payment.crid == crid))
+        if payment:
+            if result_code == 0:
+                callback_metadata = stkCallback.get('CallbackMetadata', {}).get('Item', [])
+                for item in callback_metadata:
+                    if item.get('Name') == 'MpesaReceiptNumber':
+                        payment.trans_code = item.get('Value')
+                payment.status = "completed"
+            else:
+                payment.status = "failed"
+            
+            # Commit payment status FIRST — this is critical
+            session.commit()
+    except Exception as e:
+        print({"Message":"Error Processing Callback"})
+        session.rollback()
+    return {"message":"callback received"}
+    
 
 
 app.run(debug=True)

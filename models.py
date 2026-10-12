@@ -1,15 +1,18 @@
-from sqlalchemy import ForeignKey
+from sqlalchemy import ForeignKey,DateTime
 from sqlalchemy import String,Integer,Float,Date
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import relationship
-from datetime import date
+from datetime import datetime,date
+
+
 
 
 class Base(DeclarativeBase):
      pass
-
+class TimestampMixin:
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda:datetime.now())
 
 
 
@@ -47,11 +50,17 @@ class Sale(Base):
 
 
 
-class Payment(Base):
+class Payment(Base,TimestampMixin):
     __tablename__='payments'
     id:Mapped[int]=mapped_column(Integer,primary_key=True)
     sale_id:Mapped[int]=mapped_column(Integer,ForeignKey('sales.id'))
-    date_paid:Mapped[date]=mapped_column(Date)
+    # date_paid:Mapped[date]=mapped_column(Date)
+    amount:Mapped[float]=mapped_column(Float)
+    transaction_code:Mapped[str]=mapped_column(String)
+    mrid:Mapped[str]=mapped_column(String)
+    crid:Mapped[str]=mapped_column(String)
+    status:Mapped[str]=mapped_column(String,default='pending')
+    phone_number:Mapped[str]=mapped_column(String)
 
 
 
@@ -73,3 +82,5 @@ class Sale_detail(Base):
     sale_id:Mapped[int]=mapped_column(Integer,ForeignKey('sales.id'))
     quantity:Mapped[float]=mapped_column(Float)
     amount:Mapped[int]=mapped_column(Integer)
+    
+
