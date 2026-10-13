@@ -399,7 +399,7 @@ def saf_callback():
         result_code=stkCallback.get('ResultCode')
         mrid = stkCallback.get('MerchantRequestID')
         crid = stkCallback.get('CheckoutRequestID')
-        payment=session.execute(select(Payment).where(Payment.mrid == mrid, Payment.crid == crid))
+        payment=session.scalars(select(Payment).where(Payment.mrid == mrid, Payment.crid == crid))
         if payment:
             if result_code == 0:
                 callback_metadata = stkCallback.get('CallbackMetadata', {}).get('Item', [])
@@ -413,7 +413,7 @@ def saf_callback():
             # Commit payment status FIRST — this is critical
             session.commit()
     except Exception as e:
-        print({"Message":"Error Processing Callback"})
+        print({'stk push error':e})
         session.rollback()
     return {"message":"callback received"}
     

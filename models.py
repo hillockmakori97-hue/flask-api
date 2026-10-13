@@ -56,7 +56,7 @@ class Payment(Base,TimestampMixin):
     sale_id:Mapped[int]=mapped_column(Integer,ForeignKey('sales.id'))
     # date_paid:Mapped[date]=mapped_column(Date)
     amount:Mapped[float]=mapped_column(Float)
-    transaction_code:Mapped[str]=mapped_column(String)
+    transaction_code:Mapped[str]=mapped_column(String,nullable=True,default=None)
     mrid:Mapped[str]=mapped_column(String)
     crid:Mapped[str]=mapped_column(String)
     status:Mapped[str]=mapped_column(String,default='pending')

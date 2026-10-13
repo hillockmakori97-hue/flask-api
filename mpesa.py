@@ -65,3 +65,6 @@ def make_stk_push(payload):
         headers=headers)
 
     return response.json()
+
+print(get_mpesa_access_token())
+print(generate_password_and_timestamp())
