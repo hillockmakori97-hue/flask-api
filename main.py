@@ -5,6 +5,7 @@
 # It has to return data as JSON
 from sqlalchemy import create_engine, select
 import sentry_sdk
+from generate_receipts import create_pdf
 
 from flask import Flask, request, jsonify
 from flask_jwt_extended import jwt_required, create_access_token, get_jwt_identity, JWTManager
@@ -392,6 +393,7 @@ def stk_push():
 def saf_callback():
     try:
         payload=request.get_json()
+        print('callback received')
         body=payload.get(
             'Body',{}
         )
@@ -399,14 +401,18 @@ def saf_callback():
         result_code=stkCallback.get('ResultCode')
         mrid = stkCallback.get('MerchantRequestID')
         crid = stkCallback.get('CheckoutRequestID')
-        payment=session.scalars(select(Payment).where(Payment.mrid == mrid, Payment.crid == crid))
+        payment=session.scalars(select(Payment).where(Payment.mrid == mrid, Payment.crid == crid)).first()
         if payment:
             if result_code == 0:
                 callback_metadata = stkCallback.get('CallbackMetadata', {}).get('Item', [])
                 for item in callback_metadata:
                     if item.get('Name') == 'MpesaReceiptNumber':
-                        payment.trans_code = item.get('Value')
+                        payment.transaction_code = item.get('Value')
+                    
                 payment.status = "completed"
+                session.commit()
+                text=f"Transaction Code {payment.transaction_code}, Amount: {payment.amount}, Date : {payment.created_at} "
+                create_pdf(text,payment.transaction_code)
             else:
                 payment.status = "failed"
             
@@ -416,6 +422,17 @@ def saf_callback():
         print({'stk push error':e})
         session.rollback()
     return {"message":"callback received"}
+
+
+
+
+
+@app.route('/payments', methods=alloweed_methods)
+def get_paymments():
+    query=select(Payment)
+    payments=session.scalars(query).all()
+
+    return payments
     
 
 

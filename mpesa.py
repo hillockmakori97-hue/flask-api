@@ -25,6 +25,7 @@ def get_mpesa_access_token():
             saf_api_url,
             auth=HTTPBasicAuth(consumer_key, consumer_secret),
         )
+        print(res.json()['access_token'])
         return res.json()['access_token']
     except Exception as e:
         print(str(e), "error getting access token")
@@ -66,5 +67,10 @@ def make_stk_push(payload):
 
     return response.json()
 
-print(get_mpesa_access_token())
-print(generate_password_and_timestamp())
+# print(get_mpesa_access_token())
+# print(make_stk_push({
+#     "sale_id":1,
+#     "phone_number":"254728976985",
+#     "amount":1
+# }))
+# print(generate_password_and_timestamp())6
