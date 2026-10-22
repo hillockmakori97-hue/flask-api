@@ -1,5 +1,6 @@
 import cloudinary
 import cloudinary.uploader
+from g_mail import email
 Cloud_name='cveyuvm6'
 Api_key='922563693918987'
 Secret_key='U7Odcx8EBGqS8A4fSKhYASZw5sE'
@@ -19,6 +20,7 @@ def upload_pdf(pdf_file):
 
         print(receipt_url)
         print("Successfull file upload")
+        email('hillockmakori97@gmail.com','PAYMENT RECEIPT',f'Thank you. We have received your payment.\n\n'f'Receipt: {receipt_url}')
         return 'success'
     except Exception as e:
         print(f'upload failed: {e}')
