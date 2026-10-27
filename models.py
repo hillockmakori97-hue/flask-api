@@ -44,7 +44,8 @@ class Sale(Base):
 
     id:Mapped[int]=mapped_column(Integer,primary_key=True)
     user_id:Mapped[int]=mapped_column(Integer,ForeignKey('users.id'))
-    date_sold:Mapped[date]=mapped_column(Date)
+    product_id:Mapped[int]=mapped_column(Integer,ForeignKey('products.id'))
+    date_sold:Mapped[date]=mapped_column(Date, default=lambda:datetime.now().date())
 
 
 

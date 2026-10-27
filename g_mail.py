@@ -15,4 +15,4 @@ def email(to,subject,message):
     response=client.send(mail)
     print('-----------this is mailtrap------')
     print(response)
-email('hillockmakori97@gmail.com','Testing API', 'Testing My API')
+# email('hillockmakori97@gmail.com','Testing API', 'Testing My API')

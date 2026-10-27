@@ -105,7 +105,7 @@ def products(product_id=None):
             return jsonify(error), 400
         
         new_product = Product(
-            user_id=data.get('id'),
+            user_id=user.id,
             product_name=data.get('product_name'),
             buying_price=float(data['buying_price']),
             selling_price=float(data['selling_price'])
@@ -180,6 +180,11 @@ def purchases():
 @app.route('/sales/<int:sale_id>', methods=alloweed_methods)
 @jwt_required()
 def sales(sale_id=None):
+    email=get_jwt_identity()
+    user=session.scalars(
+        select(User)
+        .where(User.email==email)
+    ).first()
     if request.method == 'GET':
         query = select(Sale)
         sales_list = session.scalars(query)
@@ -196,13 +201,13 @@ def sales(sale_id=None):
     elif request.method == 'POST':
         data = request.get_json(silent=True) or {}
         
-        if not data.get('user_id') or not data.get('date_sold'):
+        if not data.get('product_id'):
             return jsonify({'error': 'Ensure all fields are set'}), 400
         
-        date_sold = date.fromisoformat(data['date_sold'])
+
         new_sale = Sale(
-            user_id=data['user_id'],
-            date_sold=date_sold
+            user_id=user.id,
+            product_id=data.get('product_id')
         )
         session.add(new_sale)
         session.commit()
