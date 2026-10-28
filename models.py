@@ -41,11 +41,12 @@ class Product(Base):
 
 class Sale(Base):
     __tablename__='sales'
-
     id:Mapped[int]=mapped_column(Integer,primary_key=True)
     user_id:Mapped[int]=mapped_column(Integer,ForeignKey('users.id'))
     product_id:Mapped[int]=mapped_column(Integer,ForeignKey('products.id'))
     date_sold:Mapped[date]=mapped_column(Date, default=lambda:datetime.now().date())
+    product:Mapped[Product]=relationship()
+    payment:Mapped["Payment"]=relationship(back_populates='sale' ,uselist=False)
 
 
 
@@ -62,6 +63,7 @@ class Payment(Base,TimestampMixin):
     crid:Mapped[str]=mapped_column(String)
     status:Mapped[str]=mapped_column(String,default='pending')
     phone_number:Mapped[str]=mapped_column(String)
+    sale:Mapped[Sale]=relationship(back_populates='payment')
 
 
 

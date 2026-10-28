@@ -186,13 +186,19 @@ def sales(sale_id=None):
         .where(User.email==email)
     ).first()
     if request.method == 'GET':
-        query = select(Sale)
-        sales_list = session.scalars(query)
+        query = (
+            select(Sale, Product.product_name, Payment.status,Product.selling_price)
+            .join(Sale.product)
+            .outerjoin(Sale.payment)
+        )
+        sales_list = session.execute(query).all()
         result = []
-        for i in sales_list:
+        for i ,product_name ,status ,selling_price in sales_list:
             item = {
                 'id': i.id,
-                'user_id': i.user_id,
+                'product_name':product_name,
+                'selling_price':selling_price,
+                'payment_status':status or 'Unpaid',
                 'date_sold': i.date_sold.isoformat() if i.date_sold else None
             }
             result.append(item)
