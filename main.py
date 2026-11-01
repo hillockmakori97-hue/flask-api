@@ -3,7 +3,7 @@
 # It has to have a method (POST/GET/PUT/DELETE)
 # It has to have a status code
 # It has to return data as JSON
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select,insert
 import sentry_sdk
 from generate_receipts import create_pdf
 
@@ -185,21 +185,29 @@ def sales(sale_id=None):
         select(User)
         .where(User.email==email)
     ).first()
+    
+    
     if request.method == 'GET':
         query = (
-            select(Sale, Product.product_name, Payment.status,Product.selling_price)
+            select(Sale.id, Product.product_name, Payment.status,Product.selling_price,Sale.date_sold,Payment.transaction_code,Payment.amount,Payment.phone_number)
             .join(Sale.product)
             .outerjoin(Sale.payment)
         )
         sales_list = session.execute(query).all()
         result = []
-        for i ,product_name ,status ,selling_price in sales_list:
+        for i ,product_name ,status ,selling_price, date_sold ,transaction_code,amount,phone_number in sales_list:
             item = {
-                'id': i.id,
+                'id': i,
                 'product_name':product_name,
                 'selling_price':selling_price,
                 'payment_status':status or 'Unpaid',
-                'date_sold': i.date_sold.isoformat() if i.date_sold else None
+                'date_sold': date_sold.isoformat() if date_sold else None,
+                'currentPayment':{
+                    'trans_code':transaction_code,
+                    'amount':amount,
+                    'phone_number':phone_number
+                }
+               
             }
             result.append(item)
         return jsonify(result), 200
@@ -377,22 +385,29 @@ def register():
     
     return jsonify({'Error': 'Method not allowed'}), 405
 @app.route('/stk-push',methods=alloweed_methods)
+@jwt_required()
 def stk_push():
     
     try:
         payload=request.get_json()
-        response=make_stk_push(payload)
-        new_payment=Payment(
-            sale_id=payload['sale_id'],
-            amount=payload['amount'],
-            phone_number=payload['phone_number'],
-            mrid=response.get('MerchantRequestID'),
-            crid=response.get('CheckoutRequestID'),
-            status='pending'
-        )
-        session.add(new_payment)
-        session.commit()
-        return {'message':"stk push initiated"}
+        if payload.get('sale_id') and payload.get('amount') and payload.get('phone_number'):
+            response=make_stk_push(payload)
+        
+            new_payment=(insert(Payment)
+                .values(
+                sale_id=payload['sale_id'],
+                amount=payload['amount'],
+                phone_number=payload['phone_number'],
+                mrid=response.get('MerchantRequestID'),
+                crid=response.get('CheckoutRequestID'),
+                status='pending'
+            ).returning(Payment.id)
+            )
+            payment_id=session.execute(new_payment).fetchone()
+            session.commit()
+            return {'message':"stk push initiated",
+                    'payment_id':payment_id.id
+                    },200
         
     except Exception as e:
         print(f'stk-push error:{e}')
@@ -424,6 +439,7 @@ def saf_callback():
                 session.commit()
                 text=f"Transaction Code {payment.transaction_code}, Amount: {payment.amount}, Date : {payment.created_at} "
                 create_pdf(text,payment.transaction_code)
+                
             else:
                 payment.status = "failed"
             
@@ -435,16 +451,18 @@ def saf_callback():
     return {"message":"callback received"}
 
 
+@app.route('/payments_check/<int:payment_id>', methods=['GET'])
+def get_paymments(payment_id):
+    if request.method=='GET':
+        query=select(Payment.status).where(Payment.id==payment_id)
+        payments=session.scalars(query).all()
+        return {'payment_status':payments[0]},200
+    else:
+        return{'error':'method not allowed '}
+        
 
-
-
-@app.route('/payments', methods=alloweed_methods)
-def get_paymments():
-    query=select(Payment)
-    payments=session.scalars(query).all()
-
-    return payments
     
+
 
 
 app.run(debug=True)
