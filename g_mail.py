@@ -1,7 +1,10 @@
 import mailtrap
+import os
+from dotenv import load_dotenv
+load_dotenv()
 subject='FLASK-API'
 message='Testing mailing'
-token='9374bce6e73f8b2a54b983285be37f8f'
+token=os.getenv('mailtrap_api_key')
 def email(to,subject,message):
     mail=mailtrap.Mail(
         sender=mailtrap.Address(email="hello@demomailtrap.co",name="FLASK_API"),
