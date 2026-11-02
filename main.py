@@ -454,9 +454,9 @@ def saf_callback():
 @app.route('/payments_check/<int:payment_id>', methods=['GET'])
 def get_paymments(payment_id):
     if request.method=='GET':
-        query=select(Payment.status).where(Payment.id==payment_id)
-        payments=session.scalars(query).all()
-        return {'payment_status':payments[0]},200
+        query=select(Payment.status,Payment.transaction_code).where(Payment.id==payment_id)
+        payments=session.execute(query).first()
+        return {'payment_status':payments.status,'transaction_code':payments.transaction_code},200
     else:
         return{'error':'method not allowed '}
         
